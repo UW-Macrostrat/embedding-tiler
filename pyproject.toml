@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "macrostrat-embedding-tiler"
+name = "macrostrat.embedding-tiler"
 version = "0.1.0"
 description = "A tile server that computes the relevance of polygons based on embedding text"
 authors = ["Daven Quinn <code@davenquinn.com>"]
