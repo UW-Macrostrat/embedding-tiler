@@ -1,0 +1,3 @@
+[submodule "sri-ta2-mappable-criteria"]
+	path = deps/mappable-criteria
+	url = https://github.com/DARPA-CRITICALMAAS/sri-ta2-mappable-criteria.git

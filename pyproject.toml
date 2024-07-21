@@ -1,0 +1,16 @@
+[tool.poetry]
+name = "macrostrat-embedding-tiler"
+version = "0.1.0"
+description = "A tile server that computes the relevance of polygons based on embedding text"
+authors = ["Daven Quinn <code@davenquinn.com>"]
+license = "MIT"
+readme = "README.md"
+packages = [{include = "macrostrat"}]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
