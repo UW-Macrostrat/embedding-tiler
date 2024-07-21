@@ -1,6 +1,8 @@
 from mapbox_vector_tile import decode, encode
+from .utils import timer
 
 
+@timer("Process tile")
 def process_vector_tile(content: bytes):
     """
     Decode a vector tile and return the features.
