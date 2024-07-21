@@ -9,6 +9,9 @@ packages = [{include = "macrostrat"}]
 
 [tool.poetry.dependencies]
 python = "^3.11"
+fastapi = "^0.111.1"
+python-dotenv = "^1.0.1"
+httpx = "^0.27.0"
 
 
 [build-system]
