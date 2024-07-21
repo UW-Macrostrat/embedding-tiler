@@ -8,6 +8,8 @@ from fastapi import FastAPI, Request, Response
 from httpx import AsyncClient
 from fastapi.middleware.cors import CORSMiddleware
 
+from .tile_processor import process_vector_tile
+
 load_dotenv()
 
 app = FastAPI()
@@ -21,6 +23,7 @@ async def get_tile(request: Request, z: int, x: int, y: int):
     tile_url = base_url.format(z=z, x=x, y=y)
     async with AsyncClient(timeout=30) as client:
         response = await client.get(tile_url)
+        tile = process_vector_tile(response.content)
         return Response(content=response.content, media_type="application/x-protobuf")
 
 
