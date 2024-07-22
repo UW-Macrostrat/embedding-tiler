@@ -20,7 +20,7 @@ setup_stderr_logs("embedding_tiler", level=logging.INFO)
 
 log = get_logger("embedding_tiler")
 
-from .tile_processor import process_vector_tile_async
+from .tile_processor import process_vector_tile_async, models
 
 app = FastAPI()
 # Add CORS middleware
@@ -84,4 +84,4 @@ def client_disconnected_handler(request: Request, exc: ClientDisconnected):
 
 @app.get("/")
 async def root():
-    return {"base-url": base_url}
+    return {"name": "Macrostrat polygon embeddings tiler", "base-url": base_url, "models": models}
