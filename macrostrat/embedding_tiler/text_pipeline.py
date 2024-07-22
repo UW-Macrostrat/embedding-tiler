@@ -10,10 +10,6 @@ def convert_text_to_vector_hf(data, model):
     return model.encode(data)
 
 
-def convert_text_to_vector(text, model):
-    return model.encode(text)
-
-
 def rank_polygons_by_deposit_model(model_key: str, embed_model, data_, desc_col='full_desc', norm=True):
     descriptive_model = systems_dict[model_key]
     polygon_vectors = convert_text_to_vector_hf(data_[desc_col].to_list(), embed_model)
@@ -61,11 +57,11 @@ def rank_polygons(term, embed_model, data, text_col='full_desc'):
 
     group_vectors = convert_text_to_vector_hf(group_names, embed_model)
     sim = cosine_similarity(query_vec, group_vectors)[0]
+    sim = normalize(sim)
 
-    for name, sim_ in zip(group_names, sim):
-        data.loc[g1.get_group(name).index, "similarity"] = sim_
+    for group, sim_ in zip(group_names, sim):
+        data.loc[g1.get_group(group).index, "similarity"] = sim_
 
-    data['similarity'] = normalize(data['similarity'].array)
     return data
 
 
@@ -75,12 +71,10 @@ def preprocess_text(data_df, cols, desc_col='full_desc', filtering=False):
 
     data_[desc_col] = data_[cols].stack().groupby(level=0).agg(' '.join)
     data_[desc_col] = data_[desc_col].apply(lambda x: x.replace('-', ' - '))
+    # Strip extra trailing spaces
+    data_[desc_col] = data_[desc_col].str.strip()
 
     return data_
-
-
-def dfcol_sep_hyphen(dfcol):
-    return dfcol.str.replace('-', ' - ')
 
 
 def normalize(array):

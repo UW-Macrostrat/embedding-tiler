@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Now load the rest of the app
-from fastapi import FastAPI, Request, Response
+from fastapi import FastAPI, Request, Response, Query
 from httpx import AsyncClient
 from fastapi.middleware.cors import CORSMiddleware
 from macrostrat.utils import setup_stderr_logs, get_logger
@@ -46,8 +46,8 @@ async def check_client_disconnected(request: Request):
         raise ClientDisconnected("Client disconnected")
 
 
-@app.get("/tiles/{z}/{x}/{y}")
-async def get_tile(request: Request, z: int, x: int, y: int):
+@app.get("/search/{term}/tiles/{z}/{x}/{y}")
+async def get_tile(request: Request, term: str, z: int, x: int, y: int, model: str = Query("BAAI/bge-base-en-v1.5")):
     tile_url = base_url.format(z=z, x=x, y=y)
     event_loop = get_running_loop()
     # Check for client disconnection:
@@ -59,7 +59,7 @@ async def get_tile(request: Request, z: int, x: int, y: int):
 
     await check_client_disconnected(request)
 
-    res = await process_vector_tile_async(event_loop, response.content)
+    res = await process_vector_tile_async(event_loop, response.content, term, model)
     return Response(content=res, media_type="application/x-protobuf")
 
 
