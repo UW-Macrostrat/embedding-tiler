@@ -49,4 +49,13 @@ def get_data_frame(tile):
 
 
 def get_geojson(df):
-    return df.to_dict('records')
+    return list(ensure_geojson(df.to_dict('records')))
+
+
+def ensure_geojson(data):
+    for feature in data:
+        yield {
+            'type': 'Feature',
+            'geometry': feature.pop('geometry'),
+            'properties': feature.pop('properties', feature)
+        }
