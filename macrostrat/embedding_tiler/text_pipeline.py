@@ -1,9 +1,6 @@
 import numpy as N
 from sklearn.metrics.pairwise import cosine_similarity
 import pandas as P
-from nrcan_p2.data_processing import preprocessing_dfcol
-from nrcan_p2.data_processing import preprocessing_str
-from nrcan_p2.data_processing import preprocessing_df_filter
 from .deposit_models import systems_dict
 
 from .utils import timer
@@ -74,54 +71,11 @@ def rank_polygons(term, embed_model, data, text_col='full_desc'):
 
 @timer("Preprocess text")
 def preprocess_text(data_df, cols, desc_col='full_desc', filtering=False):
-    # ind_invalid = ~sgmc_subset['geometry'].is_valid
-    # sgmc_subset.loc[ind_invalid, 'geometry'] = sgmc_subset.loc[ind_invalid, 'geometry'].buffer(0)
-    data_ = data_df.copy()
+    data_ = data_df
 
     data_[desc_col] = data_[cols].stack().groupby(level=0).agg(' '.join)
     data_[desc_col] = data_[desc_col].apply(lambda x: x.replace('-', ' - '))
 
-    if filtering:
-        pipeline = [
-            dfcol_sep_hyphen,
-            preprocessing_dfcol.rm_dbl_space,
-            preprocessing_dfcol.rm_cid,
-            preprocessing_dfcol.convert_to_ascii,
-            preprocessing_dfcol.rm_nonprintable,
-            preprocessing_df_filter.filter_no_letter,
-            preprocessing_dfcol.rm_newline_hyphenation,
-            preprocessing_dfcol.rm_newline,
-            preprocessing_df_filter.filter_no_real_words_g3letter,
-            # preprocessing_df_filter.filter_l80_real_words,
-            # preprocessing_dfcol.tokenize_spacy_lg,
-            # preprocessing_dfcol.rm_stopwords_spacy,
-        ]
-
-        #
-        for i, pipe_step in enumerate(pipeline):
-            if pipe_step.__module__.split('.')[-1] == 'preprocessing_df_filter':
-                data_ = pipe_step(data_, desc_col)
-            else:
-                data_[desc_col] = pipe_step(data_[desc_col])
-            print(f'step {i}/{len(pipeline)} finished')
-
-        #
-        post_processing = [
-            preprocessing_str.rm_punct,
-            preprocessing_str.lower,
-            preprocessing_str.rm_newline
-        ]
-
-        #
-        for i, pipe_step in enumerate(post_processing):
-            data_[desc_col] = data_[desc_col].apply(pipe_step)
-            print(f'step {i}/{len(post_processing)} finished')
-
-    #
-    data_ = data_.drop(columns=['letter_count', 'is_enchant_word', 'word_char_num', 'is_enchant_word_and_g3l',
-                                'any_enchant_word_and_g3l', 'real_words', 'real_words_n', 'real_words_perc', 'n_words',
-                                'Shape_Area'], errors='ignore')
-    data_ = data_.reset_index(drop=True)
     return data_
 
 
