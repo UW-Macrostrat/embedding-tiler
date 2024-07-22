@@ -1,14 +1,18 @@
 from mapbox_vector_tile import decode, encode
 from .utils import timer
-from .text_pipeline import preprocess_text
+from .text_pipeline import preprocess_text, rank_polygon
 from sentence_transformers import SentenceTransformer
 from geopandas import GeoDataFrame
+from .deposit_models import systems_dict
+from contextvars import ContextVar
 
 # Note: for now, the model is downloaded from the Hugging Face model hub
 # on the first run. This will take a while. We will pre-load the model
 # in the future.
+
 hf_model = 'BAAI/bge-base-en-v1.5'
-embed_model = SentenceTransformer(hf_model)
+
+embed_model = ContextVar("embed_model", default=SentenceTransformer(hf_model))
 
 
 @timer("Process tile")
@@ -21,7 +25,12 @@ def process_vector_tile(content: bytes):
     df = get_data_frame(tile)
     data = preprocess_text(df, ['name', 'age', 'lith', 'descrip', 'comments'])
 
-    tile["units"]["features"] = get_geojson(df)
+    deposit_type = 'porphyry_copper'
+    _embed_model = embed_model.get()
+
+    gpd_data, cos_sim = rank_polygon(systems_dict[deposit_type], _embed_model, data)
+
+    tile["units"]["features"] = get_geojson(gpd_data)
 
     layers = create_layer_list(tile)
     return encode(layers)

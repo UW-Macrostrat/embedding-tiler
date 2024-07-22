@@ -5,6 +5,8 @@ from nrcan_p2.data_processing import preprocessing_dfcol
 from nrcan_p2.data_processing import preprocessing_str
 from nrcan_p2.data_processing import preprocessing_df_filter
 
+from .utils import timer
+
 
 def convert_text_to_vector_hf(data, model, batch_size=64):
     vectors = []
@@ -49,6 +51,7 @@ def rank_polygon(descriptive_model, embed_model, data_, desc_col='full_desc', no
     return data_, cos_sim
 
 
+@timer("Preprocess text")
 def preprocess_text(data_df, cols, desc_col='full_desc', filtering=False):
     # ind_invalid = ~sgmc_subset['geometry'].is_valid
     # sgmc_subset.loc[ind_invalid, 'geometry'] = sgmc_subset.loc[ind_invalid, 'geometry'].buffer(0)
