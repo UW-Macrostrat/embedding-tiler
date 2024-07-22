@@ -1,22 +1,16 @@
 import numpy as N
 from sklearn.metrics.pairwise import cosine_similarity
 import pandas as P
-from nrcan_p2.data_processing import preprocessing_dfcol
-from nrcan_p2.data_processing import preprocessing_str
-from nrcan_p2.data_processing import preprocessing_df_filter
-
-from .utils import timer
+from .deposit_models import systems_dict
+from macrostrat.utils.timer import Timer
 
 
-def convert_text_to_vector_hf(data, model, batch_size=64):
-    vectors = []
-    for i in range(0, len(data), batch_size):
-        vectors.append(model.encode(data[i:i + batch_size]))
-    vectors = N.concatenate(vectors, axis=0)
-    return vectors
+def convert_text_to_vector_hf(data, model):
+    return model.encode(data)
 
 
-def rank_polygon(descriptive_model, embed_model, data_, desc_col='full_desc', norm=True):
+def rank_polygons_by_deposit_model(model_key: str, embed_model, data_, desc_col='full_desc', norm=True):
+    descriptive_model = systems_dict[model_key]
     polygon_vectors = convert_text_to_vector_hf(data_[desc_col].to_list(), embed_model)
 
     query_vec = {}
@@ -48,64 +42,42 @@ def rank_polygon(descriptive_model, embed_model, data_, desc_col='full_desc', no
     # bge_all_color = float_to_color(bge_all)
     data_['bge_all'] = P.Series(list(bge_all))
     # data_['bge_all_color'] = pd.Series(list(bge_all_color))
-    return data_, cos_sim
-
-
-@timer("Preprocess text")
-def preprocess_text(data_df, cols, desc_col='full_desc', filtering=False):
-    # ind_invalid = ~sgmc_subset['geometry'].is_valid
-    # sgmc_subset.loc[ind_invalid, 'geometry'] = sgmc_subset.loc[ind_invalid, 'geometry'].buffer(0)
-    data_ = data_df.copy()
-
-    data_[desc_col] = data_[cols].stack().groupby(level=0).agg(' '.join)
-    data_[desc_col] = data_[desc_col].apply(lambda x: x.replace('-', ' - '))
-
-    if filtering:
-        pipeline = [
-            dfcol_sep_hyphen,
-            preprocessing_dfcol.rm_dbl_space,
-            preprocessing_dfcol.rm_cid,
-            preprocessing_dfcol.convert_to_ascii,
-            preprocessing_dfcol.rm_nonprintable,
-            preprocessing_df_filter.filter_no_letter,
-            preprocessing_dfcol.rm_newline_hyphenation,
-            preprocessing_dfcol.rm_newline,
-            preprocessing_df_filter.filter_no_real_words_g3letter,
-            # preprocessing_df_filter.filter_l80_real_words,
-            # preprocessing_dfcol.tokenize_spacy_lg,
-            # preprocessing_dfcol.rm_stopwords_spacy,
-        ]
-
-        #
-        for i, pipe_step in enumerate(pipeline):
-            if pipe_step.__module__.split('.')[-1] == 'preprocessing_df_filter':
-                data_ = pipe_step(data_, desc_col)
-            else:
-                data_[desc_col] = pipe_step(data_[desc_col])
-            print(f'step {i}/{len(pipeline)} finished')
-
-        #
-        post_processing = [
-            preprocessing_str.rm_punct,
-            preprocessing_str.lower,
-            preprocessing_str.rm_newline
-        ]
-
-        #
-        for i, pipe_step in enumerate(post_processing):
-            data_[desc_col] = data_[desc_col].apply(pipe_step)
-            print(f'step {i}/{len(post_processing)} finished')
-
-    #
-    data_ = data_.drop(columns=['letter_count', 'is_enchant_word', 'word_char_num', 'is_enchant_word_and_g3l',
-                                'any_enchant_word_and_g3l', 'real_words', 'real_words_n', 'real_words_perc', 'n_words',
-                                'Shape_Area'], errors='ignore')
-    data_ = data_.reset_index(drop=True)
     return data_
 
 
-def dfcol_sep_hyphen(dfcol):
-    return dfcol.str.replace('-', ' - ')
+def rank_polygons(term, embed_model, data, text_col='full_desc'):
+    query_vec = convert_text_to_vector_hf([term], embed_model)
+
+    data["similarity"] = N.nan
+
+    g1 = data.groupby(by=text_col)
+
+    group_names = list(g1.groups.keys())
+
+    group_vectors = convert_text_to_vector_hf(group_names, embed_model)
+
+    Timer.add_step("vectorize text")
+
+    sim = cosine_similarity(query_vec, group_vectors)[0]
+    sim = normalize(sim)
+
+    for group, sim_ in zip(group_names, sim):
+        data.loc[g1.get_group(group).index, "similarity"] = sim_
+
+    Timer.add_step("compute similarity")
+
+    return data
+
+
+def preprocess_text(data_df, cols, desc_col='full_desc'):
+    data_ = data_df
+
+    data_[desc_col] = data_[cols].stack().groupby(level=0).agg(' '.join)
+    data_[desc_col] = data_[desc_col].apply(lambda x: x.replace('-', ' - '))
+    # Strip extra trailing spaces
+    data_[desc_col] = data_[desc_col].str.strip()
+
+    return data_
 
 
 def normalize(array):

@@ -9,17 +9,18 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Now load the rest of the app
-from fastapi import FastAPI, Request, Response
+from fastapi import FastAPI, Request, Response, Query
 from httpx import AsyncClient
 from fastapi.middleware.cors import CORSMiddleware
 from macrostrat.utils import setup_stderr_logs, get_logger
+from macrostrat.utils.timer import Timer
 from asyncio import sleep, get_running_loop
 
 setup_stderr_logs("embedding_tiler", level=logging.INFO)
 
 log = get_logger("embedding_tiler")
 
-from .tile_processor import process_vector_tile_async
+from .tile_processor import process_vector_tile_async, models
 
 app = FastAPI()
 # Add CORS middleware
@@ -46,21 +47,33 @@ async def check_client_disconnected(request: Request):
         raise ClientDisconnected("Client disconnected")
 
 
-@app.get("/tiles/{z}/{x}/{y}")
-async def get_tile(request: Request, z: int, x: int, y: int):
+@app.get("/search/{term}/tiles/{z}/{x}/{y}")
+async def get_tile(request: Request, term: str, z: int, x: int, y: int, model: str = Query("BAAI/bge-base-en-v1.5")):
     tile_url = base_url.format(z=z, x=x, y=y)
     event_loop = get_running_loop()
     # Check for client disconnection:
     await check_client_disconnected(request)
 
-    async with AsyncClient(timeout=30) as client:
-        log.info("Fetching tile x: %s, y: %s, z: %s", x, y, z)
-        response = await client.get(tile_url)
+    timer = Timer()
+    with timer.context():
+        async with AsyncClient(timeout=30) as client:
+            log.info("Fetching tile x: %s, y: %s, z: %s", x, y, z)
+            response = await client.get(tile_url)
+            timer.add_step("fetch tile")
 
-    await check_client_disconnected(request)
+        await check_client_disconnected(request)
 
-    res = await process_vector_tile_async(event_loop, response.content)
-    return Response(content=res, media_type="application/x-protobuf")
+        res = await process_vector_tile_async(event_loop, response.content, term, model, timer)
+    log_timings(timer)
+    return Response(content=res, media_type="application/x-protobuf",
+                    headers={"Server-Timing": timer.server_timings()})
+
+
+def log_timings(timer: Timer):
+    _timings = []
+    for timing in timer.timings[1:]:
+        _timings.append(f"{timing.name}: {timing.delta:.2f}")
+    log.info("Timings: %s", ", ".join(_timings))
 
 
 @app.exception_handler(ClientDisconnected)
@@ -71,4 +84,4 @@ def client_disconnected_handler(request: Request, exc: ClientDisconnected):
 
 @app.get("/")
 async def root():
-    return {"base-url": base_url}
+    return {"name": "Macrostrat polygon embeddings tiler", "base-url": base_url, "models": models}

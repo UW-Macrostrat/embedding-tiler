@@ -1,9 +1,10 @@
 from pytest import fixture
 from pathlib import Path
 from mapbox_vector_tile import decode, encode
-from macrostrat.embedding_tiler.text_pipeline import preprocess_text, rank_polygon
+from macrostrat.embedding_tiler.text_pipeline import preprocess_text, rank_polygons_by_deposit_model
 from macrostrat.embedding_tiler.tile_processor import create_layer_list, process_vector_tile, get_data_frame, \
-    get_geojson, embed_model, systems_dict
+    get_geojson, get_model
+from macrostrat.embedding_tiler.deposit_models import systems_dict
 from geopandas import GeoDataFrame
 
 __here__ = Path(__file__).parent
@@ -56,7 +57,7 @@ def test_encode_decode_dataframe(tile_data):
 
 
 def test_decode_encode_round_trip(tile_data):
-    tile_data2 = process_vector_tile(tile_data)
+    tile_data2 = process_vector_tile(tile_data, "Porphyry copper")
     tile = decode(tile_data2)
     assert tile.keys() == {"units", "lines"}
 
@@ -69,9 +70,9 @@ def test_polygon_ranking(tile_data):
     data = preprocess_text(df, input_cols)
 
     deposit_type = 'porphyry_copper'
-    _embed_model = embed_model.get()
+    _embed_model = get_model('BAAI/bge-base-en-v1.5')
 
-    gpd_data, cos_sim = rank_polygon(systems_dict[deposit_type], _embed_model, data)
+    gpd_data = rank_polygons_by_deposit_model(deposit_type, _embed_model, data)
 
     assert len(gpd_data) > 10
     for col in input_cols:
