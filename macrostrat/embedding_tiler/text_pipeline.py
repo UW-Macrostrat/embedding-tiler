@@ -4,19 +4,21 @@ import pandas as P
 from nrcan_p2.data_processing import preprocessing_dfcol
 from nrcan_p2.data_processing import preprocessing_str
 from nrcan_p2.data_processing import preprocessing_df_filter
+from .deposit_models import systems_dict
 
 from .utils import timer
 
 
-def convert_text_to_vector_hf(data, model, batch_size=64):
-    vectors = []
-    for i in range(0, len(data), batch_size):
-        vectors.append(model.encode(data[i:i + batch_size]))
-    vectors = N.concatenate(vectors, axis=0)
-    return vectors
+def convert_text_to_vector_hf(data, model):
+    return model.encode(data)
 
 
-def rank_polygon(descriptive_model, embed_model, data_, desc_col='full_desc', norm=True):
+def convert_text_to_vector(text, model):
+    return model.encode(text)
+
+
+def rank_polygons_by_deposit_model(model_key: str, embed_model, data_, desc_col='full_desc', norm=True):
+    descriptive_model = systems_dict[model_key]
     polygon_vectors = convert_text_to_vector_hf(data_[desc_col].to_list(), embed_model)
 
     query_vec = {}
@@ -48,7 +50,26 @@ def rank_polygon(descriptive_model, embed_model, data_, desc_col='full_desc', no
     # bge_all_color = float_to_color(bge_all)
     data_['bge_all'] = P.Series(list(bge_all))
     # data_['bge_all_color'] = pd.Series(list(bge_all_color))
-    return data_, cos_sim
+    return data_
+
+
+def rank_polygons(term, embed_model, data, text_col='full_desc'):
+    query_vec = convert_text_to_vector_hf([term], embed_model)
+
+    data["similarity"] = N.nan
+
+    g1 = data.groupby(by=text_col)
+
+    group_names = list(g1.groups.keys())
+
+    group_vectors = convert_text_to_vector_hf(group_names, embed_model)
+    sim = cosine_similarity(query_vec, group_vectors)[0]
+
+    for name, sim_ in zip(group_names, sim):
+        data.loc[g1.get_group(name).index, "similarity"] = sim_
+
+    data['similarity'] = normalize(data['similarity'].array)
+    return data
 
 
 @timer("Preprocess text")

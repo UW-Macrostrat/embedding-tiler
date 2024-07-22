@@ -1,10 +1,10 @@
 from mapbox_vector_tile import decode, encode
 from .utils import timer
-from .text_pipeline import preprocess_text, rank_polygon
+from .text_pipeline import preprocess_text, rank_polygons
 from sentence_transformers import SentenceTransformer
 from geopandas import GeoDataFrame
-from .deposit_models import systems_dict
 from contextvars import ContextVar
+from os import environ
 
 # Note: for now, the model is downloaded from the Hugging Face model hub
 # on the first run. This will take a while. We will pre-load the model
@@ -12,7 +12,10 @@ from contextvars import ContextVar
 
 hf_model = 'BAAI/bge-base-en-v1.5'
 
-embed_model = ContextVar("embed_model", default=SentenceTransformer(hf_model))
+# Get  PyTorch device
+pytorch_device = environ.get("PYTORCH_DEVICE", "cpu")
+
+embed_model = ContextVar("embed_model", default=SentenceTransformer(hf_model, device=pytorch_device))
 
 
 @timer("Process tile")
@@ -25,10 +28,9 @@ def process_vector_tile(content: bytes):
     df = get_data_frame(tile)
     data = preprocess_text(df, ['name', 'age', 'lith', 'descrip', 'comments'])
 
-    deposit_type = 'porphyry_copper'
     _embed_model = embed_model.get()
 
-    gpd_data, cos_sim = rank_polygon(systems_dict[deposit_type], _embed_model, data)
+    gpd_data = rank_polygons("Magmatic sulfide PGE", _embed_model, data)
 
     tile["units"]["features"] = get_geojson(gpd_data)
 
