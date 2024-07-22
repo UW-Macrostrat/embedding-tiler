@@ -10,9 +10,10 @@ load_dotenv()
 
 # Now load the rest of the app
 from fastapi import FastAPI, Request, Response
-from httpx import Client
+from httpx import AsyncClient
 from fastapi.middleware.cors import CORSMiddleware
 from macrostrat.utils import setup_stderr_logs, get_logger
+from asyncio import sleep
 
 setup_stderr_logs("embedding_tiler", level=logging.INFO)
 
@@ -38,11 +39,20 @@ if "{z}" not in base_url:
 
 
 @app.get("/tiles/{z}/{x}/{y}")
-def get_tile(request: Request, z: int, x: int, y: int):
+async def get_tile(request: Request, z: int, x: int, y: int):
     tile_url = base_url.format(z=z, x=x, y=y)
     log.info("Fetching tile x: %s, y: %s, z: %s", x, y, z)
-    with Client(timeout=30) as client:
-        response = client.get(tile_url)
+    # Wait a tiny bit to start, in case we're zooming
+    await sleep(0.1)
+    # Check for client disconnection:
+    if request.is_disconnected():
+        return Response(content="Client disconnected", status_code=499)
+
+    async with AsyncClient(timeout=30) as client:
+        response = await client.get(tile_url)
+        if request.is_disconnected():
+            return Response(content="Client disconnected", status_code=499)
+
         res = process_vector_tile(response.content)
         return Response(content=res, media_type="application/x-protobuf")
 
