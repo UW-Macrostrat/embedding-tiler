@@ -1,5 +1,5 @@
 from mapbox_vector_tile import decode, encode
-from .utils import timer
+from macrostrat.utils.timer import Timer
 from .text_pipeline import preprocess_text, rank_polygons
 from sentence_transformers import SentenceTransformer
 from geopandas import GeoDataFrame
@@ -37,15 +37,18 @@ def get_model(model_name='BAAI/bge-base-en-v1.5'):
         raise ValueError(f"Model {model_name} not found. Available models are: {models.keys()}")
 
 
-@timer("Process tile")
 def process_vector_tile(content: bytes, term: str, model=None):
     """
     Decode a vector tile and return the features.
     """
     tile = decode(content)
 
+    Timer.add_step("decode tile")
+
     df = get_data_frame(tile)
     data = preprocess_text(df, ['name', 'age', 'lith', 'descrip', 'comments'])
+
+    Timer.add_step("preprocess text")
 
     if model is None:
         model = 'BAAI/bge-base-en-v1.5'
@@ -53,16 +56,27 @@ def process_vector_tile(content: bytes, term: str, model=None):
     _embed_model = get_model(model)
 
     gpd_data = rank_polygons(term, _embed_model, data)
+    gpd_data['model'] = model
+    gpd_data['term'] = term
 
     tile["units"]["features"] = get_geojson(gpd_data)
 
     layers = create_layer_list(tile)
-    return encode(layers)
+    tile = encode(layers)
+    Timer.add_step("encode tile")
+    return tile
 
 
-async def process_vector_tile_async(loop, content, term, model=None):
+def _process_vector_tile(content, term, model=None, timer=None):
+    if timer is None:
+        return process_vector_tile(content, term, model)
+    with timer.context():
+        return process_vector_tile(content, term, model)
+
+
+async def process_vector_tile_async(loop, content, term, model=None, timer=None):
     # None uses the default executor (ThreadPoolExecutor)
-    return await loop.run_in_executor(None, process_vector_tile, content, term, model)
+    return await loop.run_in_executor(None, _process_vector_tile, content, term, model, timer)
 
 
 def create_layer_list(tile):

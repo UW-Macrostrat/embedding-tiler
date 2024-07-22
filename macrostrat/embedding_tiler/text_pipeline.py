@@ -2,8 +2,7 @@ import numpy as N
 from sklearn.metrics.pairwise import cosine_similarity
 import pandas as P
 from .deposit_models import systems_dict
-
-from .utils import timer
+from macrostrat.utils.timer import Timer
 
 
 def convert_text_to_vector_hf(data, model):
@@ -56,17 +55,21 @@ def rank_polygons(term, embed_model, data, text_col='full_desc'):
     group_names = list(g1.groups.keys())
 
     group_vectors = convert_text_to_vector_hf(group_names, embed_model)
+
+    Timer.add_step("vectorize text")
+
     sim = cosine_similarity(query_vec, group_vectors)[0]
     sim = normalize(sim)
 
     for group, sim_ in zip(group_names, sim):
         data.loc[g1.get_group(group).index, "similarity"] = sim_
 
+    Timer.add_step("compute similarity")
+
     return data
 
 
-@timer("Preprocess text")
-def preprocess_text(data_df, cols, desc_col='full_desc', filtering=False):
+def preprocess_text(data_df, cols, desc_col='full_desc'):
     data_ = data_df
 
     data_[desc_col] = data_[cols].stack().groupby(level=0).agg(' '.join)

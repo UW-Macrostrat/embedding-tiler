@@ -13,6 +13,7 @@ from fastapi import FastAPI, Request, Response, Query
 from httpx import AsyncClient
 from fastapi.middleware.cors import CORSMiddleware
 from macrostrat.utils import setup_stderr_logs, get_logger
+from macrostrat.utils.timer import Timer
 from asyncio import sleep, get_running_loop
 
 setup_stderr_logs("embedding_tiler", level=logging.INFO)
@@ -53,14 +54,26 @@ async def get_tile(request: Request, term: str, z: int, x: int, y: int, model: s
     # Check for client disconnection:
     await check_client_disconnected(request)
 
-    async with AsyncClient(timeout=30) as client:
-        log.info("Fetching tile x: %s, y: %s, z: %s", x, y, z)
-        response = await client.get(tile_url)
+    timer = Timer()
+    with timer.context():
+        async with AsyncClient(timeout=30) as client:
+            log.info("Fetching tile x: %s, y: %s, z: %s", x, y, z)
+            response = await client.get(tile_url)
+            timer.add_step("fetch tile")
 
-    await check_client_disconnected(request)
+        await check_client_disconnected(request)
 
-    res = await process_vector_tile_async(event_loop, response.content, term, model)
-    return Response(content=res, media_type="application/x-protobuf")
+        res = await process_vector_tile_async(event_loop, response.content, term, model, timer)
+    log_timings(timer)
+    return Response(content=res, media_type="application/x-protobuf",
+                    headers={"Server-Timing": timer.server_timings()})
+
+
+def log_timings(timer: Timer):
+    _timings = []
+    for timing in timer.timings[1:]:
+        _timings.append(f"{timing.name}: {timing.delta:.2f}")
+    log.info("Timings: %s", ", ".join(_timings))
 
 
 @app.exception_handler(ClientDisconnected)
