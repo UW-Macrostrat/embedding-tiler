@@ -1,9 +1,9 @@
 import numpy as N
 from sklearn.metrics.pairwise import cosine_similarity
 import pandas as P
-from .nrcan_p2 import preprocessing_dfcol as preprocessing_dfcol
-from .nrcan_p2 import preprocessing_str as preprocessing_str
-from .nrcan_p2 import preprocessing_df_filter as preprocessing_df_filter
+from nrcan_p2.data_processing import preprocessing_dfcol
+from nrcan_p2.data_processing import preprocessing_str
+from nrcan_p2.data_processing import preprocessing_df_filter
 
 
 def convert_text_to_vector_hf(data, model, batch_size=64):

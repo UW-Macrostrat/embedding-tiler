@@ -1,5 +1,6 @@
 from mapbox_vector_tile import decode, encode
 from .utils import timer
+from .text_pipeline import preprocess_text
 from sentence_transformers import SentenceTransformer
 from geopandas import GeoDataFrame
 
@@ -18,6 +19,8 @@ def process_vector_tile(content: bytes):
     tile = decode(content)
 
     df = get_data_frame(tile)
+    data = preprocess_text(df, ['name', 'age', 'lith', 'descrip', 'comments'])
+
     tile["units"]["features"] = get_geojson(df)
 
     layers = create_layer_list(tile)

@@ -5,7 +5,7 @@ description = "A tile server that computes the relevance of polygons based on em
 authors = ["Daven Quinn <code@davenquinn.com>"]
 license = "MIT"
 readme = "README.md"
-packages = [{include = "macrostrat"}]
+packages = [{ include = "macrostrat" }, { include = "nrcan_p2" }]
 
 [tool.poetry.dependencies]
 python = "^3.11"
@@ -17,6 +17,10 @@ macrostrat-utils = "^1.2.1"
 sentence-transformers = "^3.0.1"
 pandas = "^2.2.2"
 geopandas = "^1.0.1"
+unidecode = "^1.3.8"
+spacy = "^3.7.5"
+pyenchant = "^3.2.2"
+langdetect = "^1.0.9"
 
 
 [tool.poetry.group.dev.dependencies]

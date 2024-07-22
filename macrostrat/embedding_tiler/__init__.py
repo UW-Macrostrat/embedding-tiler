@@ -2,8 +2,13 @@
 Simple tile server that proxies a Macrostrat layer
 """
 import os, logging
-
 from dotenv import load_dotenv
+
+# Sometimes we use environment variables to set
+# module load paths etc.
+load_dotenv()
+
+# Now load the rest of the app
 from fastapi import FastAPI, Request, Response
 from httpx import AsyncClient
 from fastapi.middleware.cors import CORSMiddleware
@@ -12,8 +17,6 @@ from macrostrat.utils import setup_stderr_logs
 setup_stderr_logs("embedding_tiler", level=logging.INFO)
 
 from .tile_processor import process_vector_tile
-
-load_dotenv()
 
 app = FastAPI()
 
