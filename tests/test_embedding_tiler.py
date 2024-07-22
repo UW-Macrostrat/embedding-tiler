@@ -1,5 +1,7 @@
 from fastapi.testclient import TestClient
 from macrostrat.embedding_tiler import app
+from contextlib import contextmanager
+from time import sleep
 
 client = TestClient(app)
 
@@ -10,3 +12,4 @@ def test_tile_request():
     assert response.headers["content-type"] == "application/x-protobuf"
     assert response.content is not None
     assert len(response.content) > 0
+

@@ -37,25 +37,36 @@ if "{z}" not in base_url:
 
 # app.on_event("startup")(setup_model)
 
+class ClientDisconnected(Exception):
+    pass
+
+
+async def check_client_disconnected(request: Request):
+    if await request.is_disconnected():
+        raise ClientDisconnected("Client disconnected")
+
 
 @app.get("/tiles/{z}/{x}/{y}")
 async def get_tile(request: Request, z: int, x: int, y: int):
     tile_url = base_url.format(z=z, x=x, y=y)
     event_loop = get_running_loop()
-    log.info("Fetching tile x: %s, y: %s, z: %s", x, y, z)
-    # Wait a tiny bit to start, in case we're zooming
-    await sleep(0.1)
     # Check for client disconnection:
-    # if request.is_disconnected():
-    #     return Response(content="Client disconnected", status_code=499)
+    await check_client_disconnected(request)
 
     async with AsyncClient(timeout=30) as client:
+        log.info("Fetching tile x: %s, y: %s, z: %s", x, y, z)
         response = await client.get(tile_url)
-        # if request.is_disconnected():
-        #     return Response(content="Client disconnected", status_code=499)
+
+    await check_client_disconnected(request)
 
     res = await process_vector_tile_async(event_loop, response.content)
     return Response(content=res, media_type="application/x-protobuf")
+
+
+@app.exception_handler(ClientDisconnected)
+def client_disconnected_handler(request: Request, exc: ClientDisconnected):
+    log.info("Client disconnected")
+    return Response(content="Client disconnected", status_code=499)
 
 
 @app.get("/")
