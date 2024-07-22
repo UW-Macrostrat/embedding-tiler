@@ -36,6 +36,11 @@ def process_vector_tile(content: bytes):
     return encode(layers)
 
 
+async def process_vector_tile_async(loop, content):
+    # None uses the default executor (ThreadPoolExecutor)
+    return await loop.run_in_executor(None, process_vector_tile, content)
+
+
 def create_layer_list(tile):
     layers = []
     for key, layer in tile.items():
